@@ -1,0 +1,24 @@
+[project]
+name = "voice-ai-scratch"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "sujal", email = "root.x404.x@gmail.com" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.141.1",
+    "numpy>=2.5.2",
+    "pyautogui>=0.9.54",
+    "ten-vad>=1.0.6.8",
+    "uvicorn[standard]>=0.52.4",
+    "websocket>=0.2.1",
+]
+
+[project.scripts]
+voice-ai-scratch = "voice_ai_scratch:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
