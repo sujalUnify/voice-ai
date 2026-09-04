@@ -16,6 +16,7 @@ class SpeechToText:
                 file=("audio.wav", wav_bytes),
                 model=STT_MODEL,
                 response_format="text",
+                temperature=0.01
             )
             return transcription
         except Exception as e: 

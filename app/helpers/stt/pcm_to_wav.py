@@ -6,7 +6,17 @@ class PcmToWav:
 
     @staticmethod
     def convert_pcm_to_wav(pcm_audio_array: bytearray) -> bytes:
-        return PcmToWav._create_temporary_file(pcm_audio_array)
+        try:
+            file = PcmToWav._create_temporary_file(pcm_audio_array)
+
+            # with open("test_audio.wav", "wb") as f:
+            #     f.write(file)
+
+            return file
+
+        except Exception as e:
+            print(str(e))
+            raise
 
     @staticmethod
     def _create_temporary_file(pcm_audio_array: bytearray) -> bytes:

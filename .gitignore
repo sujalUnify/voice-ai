@@ -7,5 +7,8 @@ wheels/
 *.egg-info
 
 # Virtual environments
-# .venv
-.env
+.venv
+.env 
+test.py 
+test2.py 
+.vscode 
