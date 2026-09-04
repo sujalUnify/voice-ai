@@ -9,7 +9,7 @@ class TextToSpeech:
         )
 
     async def audio_generation(self,text: str): 
-        with self.client.audio.speech.with_streaming_response.create(
+        async with self.client.audio.speech.with_streaming_response.create(
             model=TTS_MODEL,
             input=text,
             voice="eve"

@@ -1,4 +1,6 @@
 from fastapi import APIRouter,WebSocket,WebSocketDisconnect
+import logging
+
 from app.helpers import VADSession
 from app.helpers.stt import PcmToWav 
 from app.services.stt import SpeechToText

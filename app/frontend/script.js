@@ -53,6 +53,23 @@ startBtn.addEventListener("click", async () => {
         // 8. Microphone → AudioWorklet
         source.connect(processor);
     };
+    ws.onmessage = async (event) => {
+        try {
+            const audioBuffer = await audioCtx.decodeAudioData(event.data);
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioCtx.destination);
+
+            if (nextTime < audioCtx.currentTime) {
+            nextTime = audioCtx.currentTime;
+            }
+
+            source.start(nextTime);
+            nextTime += audioBuffer.duration;
+        } catch (err) {
+            console.error('Error decoding audio chunk', err);
+        }
+    };
 
     socket.onclose = () => {
         console.log("WebSocket closed");
