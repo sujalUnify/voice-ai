@@ -1,5 +1,7 @@
 const startBtn = document.getElementById("startBtn");
 startBtn.addEventListener("click", async () => {
+    const user = document.getElementById("user");
+    const ai = document.getElementById("ai");
     // 1. Create WebSocket
     const socket = new WebSocket("ws://127.0.0.1:8000/ws");
     socket.binaryType = "arraybuffer";
@@ -44,7 +46,7 @@ startBtn.addEventListener("click", async () => {
 
                 // Float32Array → its underlying bytes
                 socket.send(samples.buffer);
-            } 
+            }
             else{
                 console.log("Disconnected.")
             }
@@ -53,23 +55,34 @@ startBtn.addEventListener("click", async () => {
         // 8. Microphone → AudioWorklet
         source.connect(processor);
     };
-    ws.onmessage = async (event) => {
-        try {
-            const audioBuffer = await audioCtx.decodeAudioData(event.data);
-            const source = audioCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioCtx.destination);
+    // 3. Updated WebSocket Listener
+    socket.onmessage = async (event) => {
+        //  Ignore raw microphone binary data packets bouncing back from the server
+        if (event.data instanceof ArrayBuffer) {
+            return;
+        }
 
-            if (nextTime < audioCtx.currentTime) {
-            nextTime = audioCtx.currentTime;
+        try {
+            const data = JSON.parse(event.data);
+
+            // A. Handle User Speech Transcription
+            if (data.user) {
+                ai.textContent = "";
+                user.textContent = data.user;
             }
 
-            source.start(nextTime);
-            nextTime += audioBuffer.duration;
-        } catch (err) {
-            console.error('Error decoding audio chunk', err);
+            // B. Handle Streaming AI Response Text
+            else if (data.ai) {
+                ai.textContent += data.ai;
+            }
+            else if(data.audio){
+
+            }
+        } catch (error) {
+            console.error("Error parsing WebSocket data:", error);
         }
     };
+
 
     socket.onclose = () => {
         console.log("WebSocket closed");

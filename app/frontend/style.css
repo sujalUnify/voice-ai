@@ -1,10 +1,108 @@
-button{
-    color: green;   
-    width: 300px; 
-    height: 150px;
-} 
+* {
+    box-sizing: border-box;
+}
 
-button:hover{
-    background-color: rgb(0, 0, 0); 
+body {
+    margin: 0;
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    padding: 60px 20px;
+
+    background: #0f172a;
+    font-family: Arial, sans-serif;
     color: white;
+}
+
+/* Start button */
+
+#startBtn {
+    padding: 12px 28px;
+
+    border: none;
+    border-radius: 10px;
+
+    background: #2563eb;
+    color: white;
+
+    font-size: 16px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+#startBtn:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+#startBtn:active {
+    transform: translateY(0);
+}
+
+/* Conversation */
+
+.conversation {
+    width: min(800px, 100%);
+
+    margin-top: 40px;
+
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+/* Message */
+
+.message {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Labels */
+
+.label {
+    font-size: 14px;
+    font-weight: 600;
+    padding-left: 5px;
+}
+
+.user-label {
+    color: #60a5fa;
+}
+
+.ai-label {
+    color: #a78bfa;
+}
+
+/* Text boxes */
+
+.box {
+    width: 100%;
+    min-height: 130px;
+
+    padding: 16px;
+
+    border: 1px solid #334155;
+    border-radius: 12px;
+
+    background: #1e293b;
+    color: #f8fafc;
+
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.5;
+
+    resize: vertical;
+    outline: none;
+}
+
+.box::placeholder {
+    color: #64748b;
 }

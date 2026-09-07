@@ -3,13 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <link rel="stylesheet" href="style.css"></link>
+
+    <title>Voice AI</title>
+
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <!-- <button onclick="startProcessing()">Click here to start</button> --> 
-     <button id="startBtn">start Recording</button>
-     <!-- <button id="stopBtn">stop Recording</button> -->
+
+    <!-- Start button -->
+    <button id="startBtn">Start Talking with AI</button>
+
+    <!-- Conversation -->
+    <div class="conversation">
+
+        <div class="message">
+            <span class="label user-label">User</span>
+
+            <textarea
+                class="box"
+                id="user"
+                placeholder="User speech will appear here..."
+                readonly
+            ></textarea>
+        </div>
+
+        <div class="message">
+            <span class="label ai-label">AI</span>
+
+            <textarea
+                class="box"
+                id="ai"
+                placeholder="AI response will appear here..."
+                readonly
+            ></textarea>
+        </div>
+
+    </div>
+
     <script src="script.js"></script>
+
 </body>
 </html>

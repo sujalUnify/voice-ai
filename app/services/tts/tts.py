@@ -12,7 +12,8 @@ class TextToSpeech:
         async with self.client.audio.speech.with_streaming_response.create(
             model=TTS_MODEL,
             input=text,
-            voice="eve"
+            voice="eve",
+            response_format="pcm",
         ) as response: 
             async for chunk in response.iter_bytes():
                 yield chunk
