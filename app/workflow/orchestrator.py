@@ -1,12 +1,13 @@
-from fastapi import APIRouter,WebSocket,WebSocketDisconnect
+import json
 import logging
-import json,base64
+import asyncio
+from fastapi import APIRouter,WebSocket,WebSocketDisconnect
+
 
 from app.helpers import VADSession
+from app.helpers import GenerateAndSpeak
 from app.helpers.stt import PcmToWav
 from app.services.stt import SpeechToText
-from app.services.llm import TextToText
-from app.services.tts import TextToSpeech
 
 
 logger = logging.getLogger(__name__)
@@ -20,18 +21,18 @@ router = APIRouter(
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     logger.info("Client connected")
-    vad = VADSession()
 
     # Keep only last 110 ms
     MAX_PREBUFFER = 3500
+    CURRENT_TASK: None | asyncio.Task = None
 
+    vad = VADSession()
     before_speak_audio_buffer = bytearray()
     after_speak_audio_buffer = bytearray()
     full_audio_buffer = bytearray()
     stt = SpeechToText()
-    llm = TextToText()
-    tts = TextToSpeech()
-    text_buffer = ""
+    core_task = GenerateAndSpeak(websocket)
+
     was_speaking = False
     try:
         while True:
@@ -41,10 +42,14 @@ async def websocket_endpoint(websocket: WebSocket):
                 del before_speak_audio_buffer[:-MAX_PREBUFFER]
             # detech user speech
             states = vad.detect_speech(data)
-            # if speaking then collect it
+            # if speaking then collect it 
             if states:
+                if CURRENT_TASK and not CURRENT_TASK.done():
+                    CURRENT_TASK.cancel() 
+                    print("cancelling cuurent task")
+                    await websocket.send_text(json.dumps({"message":"cancel"}))
                 was_speaking = True
-                after_speak_audio_buffer.extend(bytearray(data))
+                after_speak_audio_buffer.extend(bytearray(data)) 
             elif was_speaking:
                 # if he finished speaking
                 was_speaking = False
@@ -66,25 +71,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     transcription = await stt.transcribe(wav_bytes)
                     transcription.strip()
                     if transcription != "":
-                        logger.info("Transcription had generated")
-                        await websocket.send_text(json.dumps({"user":transcription}))
-                        logger.info("Started generating response")
-                        async for chunk in llm.generate_response(transcription):
-                            await websocket.send_text(json.dumps({"ai":chunk}))
-                            text_buffer += chunk
-
-                            if len(text_buffer) >= 5:
-                                sentence = text_buffer
-                                text_buffer = ""
-                                logger.info("Started voice generation: %s", sentence)
-
-                                async for audio_chunk in tts.audio_generation(sentence):
-                                   base64_audio = base64.b64encode(audio_chunk).decode('utf-8')
-                                   await websocket.send_text(json.dumps({"audio":base64_audio}))
+                        CURRENT_TASK = asyncio.create_task(core_task.generate_and_speak(transcription))
+                        # await core_task.generate_and_speak(transcription)
                     else:
-                        print("Transcipsion is empty")
+                        logger.warning("Client disconnected")
                 else:
-                    print("collected audio is empty.")
+                    logger.warning("Client disconnected")
 
 
     except WebSocketDisconnect as e:

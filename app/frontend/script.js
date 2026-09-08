@@ -1,4 +1,5 @@
 const startBtn = document.getElementById("startBtn");
+let playContext, nextStartTime = 0;
 startBtn.addEventListener("click", async () => {
     const user = document.getElementById("user");
     const ai = document.getElementById("ai");
@@ -54,6 +55,85 @@ startBtn.addEventListener("click", async () => {
 
         // 8. Microphone → AudioWorklet
         source.connect(processor);
+
+        // Playback context: TTS pcm is 24 kHz 16-bit mono
+        playContext = new AudioContext({ sampleRate: 24000 });
+        nextStartTime = 0;
+    };
+
+    // base64 → Float32Array (Int16 PCM → float).
+    // A 16-bit sample can be split across two chunks, so carry odd leftover bytes over.
+    let carry = new Uint8Array(0);
+    const base64ToFloat32 = (b64) => {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+        const merged = new Uint8Array(carry.length + bytes.length);
+        merged.set(carry);
+        merged.set(bytes, carry.length);
+
+        const sampleCount = (merged.length - (merged.length % 2)) / 2;
+        const int16 = new Int16Array(merged.buffer, 0, sampleCount);
+        const float32 = new Float32Array(sampleCount);
+        for (let i = 0; i < sampleCount; i++) float32[i] = int16[i] / 32768;
+
+        carry = merged.slice(sampleCount * 2);
+        return float32;
+    };
+
+    let nextStartTime = 0;
+    const activeSources = new Set();
+
+    const playChunk = (float32, message) => {
+
+        // CANCEL AI AUDIO
+        if (message != null) {
+            console.log(" STOPPING AI AUDIO");
+
+            for (const source of activeSources) {
+                try {
+                    source.stop();
+                } catch (e) {
+                    console.log("Source already stopped");
+                }
+            }
+
+            activeSources.clear();
+
+            nextStartTime = playContext.currentTime;
+
+            return;
+        }
+
+        // NORMAL AUDIO PLAYBACK
+        const buffer = playContext.createBuffer(
+            1,
+            float32.length,
+            playContext.sampleRate
+        );
+
+        buffer.copyToChannel(float32, 0);
+
+        const source = playContext.createBufferSource();
+
+        source.buffer = buffer;
+        source.connect(playContext.destination);
+
+        if (nextStartTime < playContext.currentTime) {
+            nextStartTime = playContext.currentTime;
+        }
+
+        source.start(nextStartTime);
+
+        nextStartTime += buffer.duration;
+
+        // IMPORTANT
+        activeSources.add(source);
+
+        source.onended = () => {
+            activeSources.delete(source);
+        };
     };
     // 3. Updated WebSocket Listener
     socket.onmessage = async (event) => {
@@ -64,7 +144,14 @@ startBtn.addEventListener("click", async () => {
 
         try {
             const data = JSON.parse(event.data);
-
+            
+            if (data.message){
+                // it means now cancel now we have to wrap up or just empty the ques stuff
+                console.log("Stop meesaeg reached");
+                playChunk([],"cancel");
+                ai.textContent = "";
+                user.textContent = "";
+            }
             // A. Handle User Speech Transcription
             if (data.user) {
                 ai.textContent = "";
@@ -75,8 +162,8 @@ startBtn.addEventListener("click", async () => {
             else if (data.ai) {
                 ai.textContent += data.ai;
             }
-            else if(data.audio){
-
+            else if (data.audio) {
+                playChunk(base64ToFloat32(data.audio),null);
             }
         } catch (error) {
             console.error("Error parsing WebSocket data:", error);
