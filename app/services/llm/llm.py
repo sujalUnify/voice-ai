@@ -1,6 +1,9 @@
+import logging
 from langchain_openai import ChatOpenAI
 from app.config import OPENROUTER_API_KEY, LLM_MODEL
 
+
+logger = logging.getLogger(__name__)
 
 class TextToText:
 
@@ -17,4 +20,5 @@ class TextToText:
             async for chunk in self.client._astream(transcription): 
                 yield chunk.message.content
         except Exception as e:
+            logger.exception("Failed in text Generation : %s",str(e))
             yield f"Error: {str(e)}"

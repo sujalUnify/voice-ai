@@ -25,7 +25,7 @@ class GenerateAndSpeak:
 
                 # flush once a sentence is complete (or buffer gets too long)
                 if text_buffer[-1:] in (".", "!", "?", "\n") or len(text_buffer) > 60:
-                    logger.info("Started voice generation: %s", text_buffer)
+                    logger.info("Started voice generation")
                     await self._speak(text_buffer)
                     text_buffer = ""
 
@@ -37,7 +37,7 @@ class GenerateAndSpeak:
             logger.info("Task is cancelled") 
             raise
         except Exception as e: 
-            logger.info("There is error : ",str(e)) 
+            logger.info("There is error : %s",str(e)) 
 
     async def _speak(self,text: str):
             async for audio_chunk in self.tts.audio_generation(text):

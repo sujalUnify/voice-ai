@@ -1,6 +1,7 @@
 import json
 import logging
-import asyncio
+import asyncio 
+import contextlib
 from fastapi import APIRouter,WebSocket,WebSocketDisconnect
 
 
@@ -41,12 +42,17 @@ async def websocket_endpoint(websocket: WebSocket):
             if len(before_speak_audio_buffer) > MAX_PREBUFFER:
                 del before_speak_audio_buffer[:-MAX_PREBUFFER]
             # detech user speech
-            states = vad.detect_speech(data)
+            is_speaking = vad.detect_speech(data)
             # if speaking then collect it 
-            if states:
+            if is_speaking:
                 if CURRENT_TASK and not CURRENT_TASK.done():
                     CURRENT_TASK.cancel() 
-                    print("cancelling cuurent task")
+
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await CURRENT_TASK 
+
+                    CURRENT_TASK = None
+                    logger.info("Current task is cancelled.")
                     await websocket.send_text(json.dumps({"message":"cancel"}))
                 was_speaking = True
                 after_speak_audio_buffer.extend(bytearray(data)) 
@@ -69,7 +75,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     #send audio for transcription
                     transcription = await stt.transcribe(wav_bytes)
-                    transcription.strip()
                     if transcription != "":
                         CURRENT_TASK = asyncio.create_task(core_task.generate_and_speak(transcription))
                         # await core_task.generate_and_speak(transcription)

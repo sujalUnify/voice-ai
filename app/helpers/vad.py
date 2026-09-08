@@ -1,6 +1,9 @@
 from ten_vad import TenVad
 from numpy import frombuffer, int16
 from app.config import SILENCE_DURATION_MS
+import logging
+
+logger = logging.getLogger(__name__)
 # ten-vad
 class VADSession:
     def __init__(self):
@@ -38,5 +41,6 @@ class VADSession:
                         self.speaking = False
             return self.speaking
         except Exception as e: 
-            return str(e)
+            logger.exception("VAD detection failed : %s",str(e)) 
+            return self.speaking
 
