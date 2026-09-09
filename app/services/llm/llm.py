@@ -1,6 +1,7 @@
 import logging
 from langchain_openai import ChatOpenAI
-from app.config import OPENROUTER_API_KEY, LLM_MODEL
+from app.config import OPENROUTER_API_KEY, LLM_MODEL 
+from app.exceptions.generation_exception import LLMGenerationError
 
 
 logger = logging.getLogger(__name__)
@@ -21,4 +22,4 @@ class TextToText:
                 yield chunk.message.content
         except Exception as e:
             logger.exception("Failed in text Generation : %s",str(e))
-            yield f"Error: {str(e)}"
+            raise LLMGenerationError(1002,detail=str(e))

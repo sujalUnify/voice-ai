@@ -10,5 +10,6 @@ wheels/
 .venv
 .env 
 test.py 
-test2.py 
+test2.py
+test3.py 
 .vscode 

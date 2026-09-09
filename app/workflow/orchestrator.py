@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 from fastapi import APIRouter,WebSocket,WebSocketDisconnect
 
-
 from app.helpers import VADSession
 from app.helpers import GenerateAndSpeak
 from app.helpers.stt import PcmToWav
@@ -13,13 +12,17 @@ from app.services.stt import SpeechToText
 
 logger = logging.getLogger(__name__)
 
+response_id = 0
+def get_current_response_id():
+    global response_id
+    return response_id
 router = APIRouter(
     prefix="/ws",
     tags=["voice-to-voice"]
 )
-
 @router.websocket("")
 async def websocket_endpoint(websocket: WebSocket):
+    global response_id
     await websocket.accept()
     logger.info("Client connected")
 
@@ -53,13 +56,14 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     CURRENT_TASK = None
                     logger.info("Current task is cancelled.")
-                    await websocket.send_text(json.dumps({"message":"cancel"}))
+                    await websocket.send_text(json.dumps({"message":"cancel","response_id":response_id})) 
                 was_speaking = True
                 after_speak_audio_buffer.extend(bytearray(data)) 
             elif was_speaking:
                 # if he finished speaking
                 was_speaking = False
                 if after_speak_audio_buffer:
+                    response_id+=1
                     #logic for Pre-Buffer
 
                     full_audio_buffer.extend(before_speak_audio_buffer)
@@ -76,7 +80,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     #send audio for transcription
                     transcription = await stt.transcribe(wav_bytes)
                     if transcription != "":
-                        CURRENT_TASK = asyncio.create_task(core_task.generate_and_speak(transcription))
+                        CURRENT_TASK = asyncio.create_task(
+                            core_task.generate_and_speak(
+                                transcription,response_id,get_current_response_id))
                         # await core_task.generate_and_speak(transcription)
                     else:
                         logger.warning("Client disconnected")

@@ -1,6 +1,7 @@
 from groq import AsyncGroq
 import logging
-from app.config import STT_MODEL, GROQ_API_KEY
+from app.config import STT_MODEL, GROQ_API_KEY 
+from app.exceptions.generation_exception import LLMGenerationError
 
 
 logger = logging.getLogger(__name__)
@@ -21,5 +22,5 @@ class SpeechToText:
             )
             return transcription
         except Exception as e: 
-            logger.exception("Failed to create transcripsion : %s",str(e)) 
-            raise LLMGenerationError(f"Trasncripsion failed : {str(e)}") from e
+            logger.exception("Failed to create transcription : %s",str(e)) 
+            raise LLMGenerationError(1001,detail=str(e))

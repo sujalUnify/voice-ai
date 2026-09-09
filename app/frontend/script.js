@@ -82,7 +82,6 @@ startBtn.addEventListener("click", async () => {
         return float32;
     };
 
-    let nextStartTime = 0;
     const activeSources = new Set();
 
     const playChunk = (float32, message) => {
@@ -136,37 +135,41 @@ startBtn.addEventListener("click", async () => {
         };
     };
     // 3. Updated WebSocket Listener
-    socket.onmessage = async (event) => {
-        //  Ignore raw microphone binary data packets bouncing back from the server
-        if (event.data instanceof ArrayBuffer) {
-            return;
-        }
+    let currentResponseId = 0;
 
+    socket.onmessage = async (event) => {
+        if (event.data instanceof ArrayBuffer) return;
         try {
             const data = JSON.parse(event.data);
-            
-            if (data.message){
-                // it means now cancel now we have to wrap up or just empty the ques stuff
-                console.log("Stop meesaeg reached");
-                playChunk([],"cancel");
+            // User interrupted AI
+            if (data.message) {
+                currentResponseId++;
+                playChunk([], "cancel");
+
                 ai.textContent = "";
                 user.textContent = "";
+                return;
             }
-            // A. Handle User Speech Transcription
+            // Ignore old response chunks
+            if (data.response_id !== undefined && data.response_id !== currentResponseId){
+                return;
+            }
+
             if (data.user) {
                 ai.textContent = "";
                 user.textContent = data.user;
             }
-
-            // B. Handle Streaming AI Response Text
             else if (data.ai) {
                 ai.textContent += data.ai;
             }
             else if (data.audio) {
-                playChunk(base64ToFloat32(data.audio),null);
+                playChunk(
+                    base64ToFloat32(data.audio),
+                    null
+                );
             }
         } catch (error) {
-            console.error("Error parsing WebSocket data:", error);
+            console.error("WebSocket message error:", error);
         }
     };
 
