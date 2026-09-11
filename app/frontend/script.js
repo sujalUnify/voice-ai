@@ -1,5 +1,7 @@
 const startBtn = document.getElementById("startBtn");
 let playContext, nextStartTime = 0;
+let currentResponseId = null;     // response id we are currently playing
+let carry = new Uint8Array(0);    // leftover odd byte between audio messages
 startBtn.addEventListener("click", async () => {
     const user = document.getElementById("user");
     const ai = document.getElementById("ai");
@@ -13,7 +15,10 @@ startBtn.addEventListener("click", async () => {
         // 2. Get microphone
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
-                channelCount: 1
+                channelCount: 1,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
             }
         });
 
@@ -61,26 +66,16 @@ startBtn.addEventListener("click", async () => {
         nextStartTime = 0;
     };
 
-    // base64 → Float32Array (Int16 PCM → float).
-    // A 16-bit sample can be split across two chunks, so carry odd leftover bytes over.
-    let carry = new Uint8Array(0);
-    const base64ToFloat32 = (b64) => {
-        const bin = atob(b64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        // convert int16 pcm samples into float32
+    const pcm16ToFloat32 = (int16) => {
+    const float32 = new Float32Array(int16.length);
 
-        const merged = new Uint8Array(carry.length + bytes.length);
-        merged.set(carry);
-        merged.set(bytes, carry.length);
+    for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768;
+    }
 
-        const sampleCount = (merged.length - (merged.length % 2)) / 2;
-        const int16 = new Int16Array(merged.buffer, 0, sampleCount);
-        const float32 = new Float32Array(sampleCount);
-        for (let i = 0; i < sampleCount; i++) float32[i] = int16[i] / 32768;
-
-        carry = merged.slice(sampleCount * 2);
-        return float32;
-    };
+    return float32;
+};
 
     const activeSources = new Set();
 
@@ -134,42 +129,75 @@ startBtn.addEventListener("click", async () => {
             activeSources.delete(source);
         };
     };
-    // 3. Updated WebSocket Listener
-    let currentResponseId = 0;
 
     socket.onmessage = async (event) => {
-        if (event.data instanceof ArrayBuffer) return;
         try {
+            try{
+                if(event.data instanceof ArrayBuffer){
+                    const fullBuffer = event.data;  // This is the raw ArrayBuffer
+
+                    // unpack the 4-Byte Integer header 
+                    const view = new DataView(fullBuffer); 
+
+                    // getUint32(byteOffset, littleEndian)
+                    // We use 0 for the offset (start at the beginning)
+                    // We use false for littleEndian because Python's '!I' is Big-Endian
+                    const incoming_response_id = view.getUint32(0,false); 
+
+                    if(incoming_response_id != currentResponseId){
+                        return 
+                    }
+                   // 1. Merge the header-stripped payload with any leftover odd
+                    // byte from the previous message: a 16-bit sample can be
+                    // split across two WebSocket messages, so its first byte
+                    // must be carried over instead of being dropped.
+                    const body = new Uint8Array(fullBuffer, 4);
+                    const merged = new Uint8Array(carry.length + body.length);
+                    merged.set(carry);
+                    merged.set(body, carry.length);
+
+                    // 2. Only whole samples (even byte count) can be decoded;
+                    // the odd byte, if any, is kept for the next message.
+                    const usable = merged.length - (merged.length % 2);
+
+                    if (usable > 0) {
+                        const pcm16Samples = new Int16Array(merged.buffer, 0, usable / 2);
+                        playChunk(pcm16ToFloat32(pcm16Samples));
+                    }
+
+                    carry = merged.slice(usable);
+
+                    return
+                }
+            } catch(error){
+                console.log("Error in procesing raw binary audio. Here is details"+error)
+            }
+            // process rest as it is
             const data = JSON.parse(event.data);
+            // console.log(data);
             // User interrupted AI
             if (data.message) {
-                currentResponseId++;
-                playChunk([], "cancel");
-
+                console.log("Stopped messaged arrived.")
+                playChunk([], "stop");
+                currentResponseId = null;       // in-flight stragglers now fail the id check
+                carry = new Uint8Array(0);      // reset byte-alignment carry too
                 ai.textContent = "";
                 user.textContent = "";
                 return;
             }
-            // Ignore old response chunks
-            if (data.response_id !== undefined && data.response_id !== currentResponseId){
-                return;
-            }
-
-            if (data.user) {
+            if (data.user !== undefined) {      // new turn: adopt the server's id
+                currentResponseId = data.response_id;
                 ai.textContent = "";
                 user.textContent = data.user;
+                return;
             }
-            else if (data.ai) {
+            if (data.response_id !== currentResponseId) return;  // stale chunk
+
+             if(data.ai !== undefined){
                 ai.textContent += data.ai;
             }
-            else if (data.audio) {
-                playChunk(
-                    base64ToFloat32(data.audio),
-                    null
-                );
-            }
         } catch (error) {
-            console.error("WebSocket message error:", error);
+            console.error("WebSocket message error:"+ error);
         }
     };
 

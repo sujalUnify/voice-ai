@@ -1,6 +1,12 @@
-from openai import AsyncOpenAI
+import asyncio
+import logging
+from openai import AsyncOpenAI 
+
 from app.config import OPENROUTER_API_KEY,TTS_MODEL  
-from app.exceptions.generation_exception import LLMGenerationError
+from app.exceptions import LLMGenerationError
+
+
+logger = logging.getLogger(__name__)
 
 class TextToSpeech:
     def __init__(self):
@@ -18,6 +24,12 @@ class TextToSpeech:
                 response_format="pcm",
             ) as response: 
                 async for chunk in response.iter_bytes():
-                    yield chunk 
+                    yield chunk  
+
+        except asyncio.CancelledError: 
+            logger.info("STT generation cancelled")
+            raise 
+
         except Exception as e: 
+            logger.info("There is exception in TTS : %s",str(e))
             raise LLMGenerationError(1003,detail=str(e))
