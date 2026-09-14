@@ -22,12 +22,22 @@ class TextToText:
             base_url="https://openrouter.ai/api/v1",
         )
 
-    async def generate_response(self, transcription: str):
+
+    async def generate_response(self, transcription: str,history_context):
         try:
+            history = history_context.get_conversation()
+            print("here is history : ",history)
             messages = [
                 ("system", self.prompt),
-                ("human", transcription)
             ]
+            for conversation in history:
+                if conversation.get("user"):
+                    messages.append(("user", conversation["user"]))
+                elif conversation.get("ai"):
+                    messages.append(("ai", conversation["ai"]))
+
+            messages.append(("user", transcription))
+
             async for chunk in self.client.astream(messages): 
                 yield chunk.content
 

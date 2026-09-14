@@ -2,8 +2,7 @@ import json
 import logging
 import asyncio 
 from fastapi import APIRouter,WebSocket,WebSocketDisconnect
-
-from app.helpers import VADSession,GenerateAndSpeak,reap
+from app.helpers import VADSession,GenerateAndSpeak,reap,ConversationProcessor
 from app.helpers.stt import PcmToWav
 from app.services.stt import SpeechToText
 
@@ -29,15 +28,16 @@ async def websocket_endpoint(websocket: WebSocket):
         return response_id
 
     vad = VADSession()
+
     before_speak_audio_buffer = bytearray()
     after_speak_audio_buffer = bytearray()
     full_audio_buffer = bytearray()
     stt = SpeechToText()
     core_task = GenerateAndSpeak(websocket)
-
+    history_context = ConversationProcessor()
     was_speaking = False
 
-    async def process_utterance(wav_bytes: bytes, rid: int):
+    async def process_utterance(wav_bytes: bytes, rid: int, history_context: ConversationProcessor):
         nonlocal CURRENT_TASK
         try:
             transcription = await stt.transcribe(wav_bytes)
@@ -48,7 +48,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # empty transcript, or user started talking again while we transcribed
             return
         CURRENT_TASK = asyncio.create_task(
-            core_task.generate_and_speak(transcription, rid, get_current_response_id)
+            core_task.generate_and_speak(transcription, rid, get_current_response_id, history_context)
         )
     try:
         while True:
@@ -85,11 +85,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 full_audio_buffer.extend(after_speak_audio_buffer)
                 after_speak_audio_buffer.clear()
                 before_speak_audio_buffer.clear()
-                if len(full_audio_buffer) > 3200:   # ignore <100 ms blips
+                if len(full_audio_buffer) > 3200:   # ignore < 100 ms blips
                     response_id += 1
                     wav_bytes = PcmToWav.convert_pcm_to_wav(bytes(full_audio_buffer))
                     full_audio_buffer.clear()
-                    CURRENT_STT_TASK = asyncio.create_task(process_utterance(wav_bytes, response_id))  # don't block the loop
+                    CURRENT_STT_TASK = asyncio.create_task(process_utterance(wav_bytes, response_id,history_context))  # don't block the loop
                 else:
                     full_audio_buffer.clear() 
             else:
