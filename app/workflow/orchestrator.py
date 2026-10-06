@@ -5,6 +5,7 @@ from fastapi import APIRouter,WebSocket,WebSocketDisconnect
 from app.helpers import VADSession,GenerateAndSpeak,reap,ConversationProcessor
 from app.helpers.stt import PcmToWav
 from app.services.stt import SpeechToText
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ async def websocket_endpoint(websocket: WebSocket):
         if not transcription or vad.speaking:
             # empty transcript, or user started talking again while we transcribed
             return
+        stt_end = time.perf_counter()
+        print(f"STT duration: {(stt_end - start) * 1000:.1f} ms")
         CURRENT_TASK = asyncio.create_task(
             core_task.generate_and_speak(transcription, rid, get_current_response_id, history_context)
         )
@@ -80,6 +83,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 was_speaking = True
                 after_speak_audio_buffer.extend(bytearray(data)) 
             elif was_speaking:
+                start = time.perf_counter()
                 # END OF UTTERANCE
                 was_speaking = False
                 full_audio_buffer.extend(after_speak_audio_buffer)
