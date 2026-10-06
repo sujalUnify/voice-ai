@@ -6,6 +6,7 @@ import contextlib
 from app.services.llm import TextToText 
 from app.services.tts import TextToSpeech 
 from fastapi.websockets import WebSocketDisconnect
+import time 
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +29,24 @@ class GenerateAndSpeak:
             full_buffer = ""
             first_fragment = True
             try:
+                start = time.perf_counter()
+                first_chunk = True
                 async for chunk in self.llm.generate_response(transcription,history_context):
                     if response_id != get_current_response_id():
                         return
                     await self.websocket.send_text(json.dumps({"ai": chunk, "response_id": response_id}))
+                    if first_chunk:
+                        elapsed = (time.perf_counter() - start) * 1000
+                        # print(f"LLM FIRST CHUNK: {elapsed:.1f} ms")
+                        first_chunk = False
+
                     text_buffer += chunk 
                     full_buffer += chunk
 
                     is_sentence_end = text_buffer[-1:] in (".", "!", "?", "\n")
                     # first fragment: flush small so the voice starts fast;
                     # after that: sentence boundaries, with a safety valve
-                    long_enough = (first_fragment and (len(text_buffer) > 15) or len(text_buffer) > 120)
+                    long_enough = (first_fragment and (len(text_buffer) > 10) or len(text_buffer) > 100)
 
                     if is_sentence_end or long_enough:
                         queue.put_nowait(text_buffer)   # never blocks → LLM keeps flowing

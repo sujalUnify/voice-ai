@@ -11,7 +11,8 @@ load_dotenv()
 # Make logger.info() from the orchestrator show up in the console
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
+    format="%(asctime)s.%(msecs)03d | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 
 app = FastAPI()
