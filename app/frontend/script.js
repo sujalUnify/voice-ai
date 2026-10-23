@@ -22,7 +22,7 @@ startBtn.addEventListener("click", async () => {
             }
         });
 
-        // 3. Create AudioContext
+        // 3. Create AudioContext (mic capture; browser downsamples to 16 kHz)
         const audioContext = new AudioContext({
             sampleRate: 16000
         });
@@ -45,12 +45,9 @@ startBtn.addEventListener("click", async () => {
 
             const samples = event.data;
 
-            // console.log("Samples:", samples);
-            // console.log("Number:", samples.length);
-
             if (socket.readyState === WebSocket.OPEN) {
 
-                // Float32Array → its underlying bytes
+                // Int16Array → its underlying bytes (512 samples = 32 ms)
                 socket.send(samples.buffer);
             }
             else{
@@ -61,8 +58,7 @@ startBtn.addEventListener("click", async () => {
         // 8. Microphone → AudioWorklet
         source.connect(processor);
 
-        // Playback context: TTS pcm is 24 kHz 16-bit mono
-        playContext = new AudioContext({ sampleRate: 24000 });
+        // Playback context is created lazily at the server's TTS rate.
         nextStartTime = 0;
     };
 
@@ -78,6 +74,20 @@ startBtn.addEventListener("click", async () => {
 };
 
     const activeSources = new Set();
+
+    // The server announces the TTS sample rate with every turn; keep the
+    // playback context at exactly that rate so no resampling happens anywhere.
+    const ensurePlayContext = (rate) => {
+        if (playContext && playContext.sampleRate === rate && playContext.state !== "closed") {
+            return playContext;
+        }
+        if (playContext && playContext.state !== "closed") {
+            playContext.close().catch(() => {});
+        }
+        playContext = new AudioContext({ sampleRate: rate, latencyHint: "interactive" });
+        nextStartTime = 0;
+        return playContext;
+    };
 
     const playChunk = (float32, message) => {
 
@@ -95,7 +105,7 @@ startBtn.addEventListener("click", async () => {
 
             activeSources.clear();
 
-            nextStartTime = playContext.currentTime;
+            nextStartTime = playContext ? playContext.currentTime : 0;
 
             return;
         }
@@ -136,21 +146,19 @@ startBtn.addEventListener("click", async () => {
                 if(event.data instanceof ArrayBuffer){
                     const fullBuffer = event.data;  // This is the raw ArrayBuffer
 
-                    // unpack the 4-Byte Integer header 
-                    const view = new DataView(fullBuffer); 
+                    // unpack the 4-Byte Integer header
+                    const view = new DataView(fullBuffer);
 
-                    // getUint32(byteOffset, littleEndian)
-                    // We use 0 for the offset (start at the beginning)
                     // We use false for littleEndian because Python's '!I' is Big-Endian
-                    const incoming_response_id = view.getUint32(0,false); 
+                    const incoming_response_id = view.getUint32(0,false);
 
                     if(incoming_response_id != currentResponseId){
-                        return 
+                        return
                     }
                    // 1. Merge the header-stripped payload with any leftover odd
-                    // byte from the previous message: a 16-bit sample can be
-                    // split across two WebSocket messages, so its first byte
-                    // must be carried over instead of being dropped.
+                   // byte from the previous message: a 16-bit sample can be
+                   // split across two WebSocket messages, so its first byte
+                   // must be carried over instead of being dropped.
                     const body = new Uint8Array(fullBuffer, 4);
                     const merged = new Uint8Array(carry.length + body.length);
                     merged.set(carry);
@@ -174,7 +182,6 @@ startBtn.addEventListener("click", async () => {
             }
             // process rest as it is
             const data = JSON.parse(event.data);
-            // console.log(data);
             // User interrupted AI
             if (data.message) {
                 console.log("Stopped messaged arrived.")
@@ -187,6 +194,7 @@ startBtn.addEventListener("click", async () => {
             }
             if (data.user !== undefined) {      // new turn: adopt the server's id
                 currentResponseId = data.response_id;
+                ensurePlayContext(data.tts_rate || 24000);
                 ai.textContent = "";
                 user.textContent = data.user;
                 return;

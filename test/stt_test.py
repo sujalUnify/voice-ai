@@ -1,52 +1,72 @@
 import asyncio
-import time
+import aiohttp
 import os
+import time
 
-from groq import AsyncGroq
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = AsyncGroq(
-    api_key=os.getenv("GROQ_API_KEY")
-)
-
-TTS_MODEL = "canopylabs/orpheus-v1-english"
-
 
 async def main():
+    url = "https://openrouter.ai/api/v1/audio/speech"
 
-    text = "Hello, how are you doing today?"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": "fish-audio/s2.1-pro-free:free",
+        "input": "Hello, how are you doing today?",
+        "response_format": "pcm",
+    }
 
     start = time.perf_counter()
     first_audio = True
     total_bytes = 0
+    chunks = 0
 
-    print("Starting Groq TTS request...")
+    print("Starting Fish Audio S2.1 Pro TTS...")
 
-    response = await client.audio.speech.create(
-        model=TTS_MODEL,
-        voice="autumn",
-        input=text,
-        response_format="wav",
-    )
+    async with aiohttp.ClientSession() as session:
 
-    async for chunk in response.iter_bytes():
+        async with session.post(
+            url,
+            headers=headers,
+            json=payload,
+        ) as response:
 
-        if not chunk:
-            continue
+            print("STATUS:", response.status)
+            print("CONTENT TYPE:", response.headers.get("content-type"))
 
-        if first_audio:
-            elapsed = (time.perf_counter() - start) * 1000
-            print(f"FIRST AUDIO CHUNK: {elapsed:.1f} ms")
-            first_audio = False
+            if response.status != 200:
+                print("ERROR:")
+                print(await response.text())
+                return
 
-        total_bytes += len(chunk)
+            print("SUCCESS")
+
+            async for chunk in response.content.iter_chunked(4096):
+
+                if not chunk:
+                    continue
+
+                chunks += 1
+                total_bytes += len(chunk)
+
+                if first_audio:
+                    elapsed = (time.perf_counter() - start) * 1000
+                    print(f"FIRST AUDIO: {elapsed:.1f} ms")
+                    first_audio = False
+
 
     total = (time.perf_counter() - start) * 1000
 
-    print(f"\nTOTAL TIME: {total:.1f} ms")
-    print(f"TOTAL AUDIO BYTES: {total_bytes}")
+    print("\n--- RESULTS ---")
+    print(f"TOTAL TIME: {total:.1f} ms")
+    print(f"TOTAL BYTES: {total_bytes}")
+    print(f"TOTAL CHUNKS: {chunks}")
 
 
 if __name__ == "__main__":

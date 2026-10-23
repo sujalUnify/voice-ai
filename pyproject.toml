@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "aiohttp>=3.14.4",
     "faker>=40.38.0",
     "fastapi>=0.141.1",
     "groq>=0.37.1",
@@ -16,6 +17,7 @@ dependencies = [
     "numpy>=2.5.2",
     "openpyxl>=3.1.5",
     "pyautogui>=0.9.54",
+    "scipy>=1.18.1",
     "sounddevice>=0.5.6",
     "ten-vad>=1.0.6.8",
     "uvicorn[standard]>=0.52.4",
