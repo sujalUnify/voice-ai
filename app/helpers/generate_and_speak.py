@@ -40,15 +40,16 @@ class GenerateAndSpeak:
                         # print(f"LLM FIRST CHUNK: {elapsed:.1f} ms")
                         first_chunk = False
 
-                    text_buffer += chunk 
+                    text_buffer += chunk
                     full_buffer += chunk
 
                     is_sentence_end = text_buffer[-1:] in (".", "!", "?", "\n")
                     # first fragment: flush small so the voice starts fast;
-                    # after that: sentence boundaries, with a safety valve
-                    long_enough = (first_fragment and (len(text_buffer) > 10) or len(text_buffer) > 100)
-
-                    if is_sentence_end or long_enough:
+                    # after that, coalesce multiple sentences per TTS request —
+                    # Groq Orpheus free tier is ~100 requests/day, and one
+                    # request per sentence burns it in ~20 responses
+                    long_enough = (first_fragment and (len(text_buffer) > 10) or len(text_buffer) > 150)
+                    if is_sentence_end and long_enough:
                         queue.put_nowait(text_buffer)   # never blocks → LLM keeps flowing
                         text_buffer = ""
                         first_fragment = False
@@ -84,13 +85,17 @@ class GenerateAndSpeak:
             if fragment is None:
                 return
             await self._speak(fragment, response_id, get_current_response_id)
-    async def _speak(self,text: str,response_id,get_current_response_id): 
+    async def _speak(self,text: str,response_id,get_current_response_id):
             try:
                 async for audio_chunk in self.tts.audio_generation(text):
                     if response_id != get_current_response_id():
                         return
-                    response_id_in_bytes = struct.pack("!I",response_id) 
+                    response_id_in_bytes = struct.pack("!I",response_id)
                     final_bytes = response_id_in_bytes + audio_chunk
                     await self.websocket.send_bytes(final_bytes)
-            except Exception as e: 
-                raise Exception("Something went wrong : ",str(e))
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                # one failed fragment (e.g. 429) must not kill the worker and
+                # drop every remaining fragment — skip and keep speaking
+                logger.error("TTS fragment skipped: %s", str(e)[:200])

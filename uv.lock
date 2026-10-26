@@ -143,6 +143,23 @@ wheels = [
 ]
 
 [[package]]
+name = "elevenlabs"
+version = "2.74.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "pydantic-core" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/03/b53b9d46dc6e682aa5595059d8035193405715613ad38eed69a1e609e047/elevenlabs-2.74.1.tar.gz", hash = "sha256:7f7159e8c079b753363b387b4e6a8c0d3b413df2adb435eec3befd4ea8f48e1f", size = 884448, upload-time = "2026-10-20T13:25:28.714Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/3b/100069b49ee9ae7eea63c57e97beb84143dcb607645e0357688ffe1674e2/elevenlabs-2.74.1-py3-none-any.whl", hash = "sha256:e94380ea301cb2324ec6daf05f0cf567ac9831454ca3f1fa7cfdb62d48705d27", size = 2320472, upload-time = "2026-10-20T13:25:26.301Z" },
+]
+
+[[package]]
 name = "et-xmlfile"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -980,6 +997,7 @@ name = "voice-ai-scratch"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "elevenlabs" },
     { name = "faker" },
     { name = "fastapi" },
     { name = "groq" },
@@ -996,6 +1014,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "elevenlabs", specifier = ">=2.74.1" },
     { name = "faker", specifier = ">=40.38.0" },
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "groq", specifier = ">=0.37.1" },

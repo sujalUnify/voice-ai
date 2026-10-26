@@ -32,6 +32,13 @@ class TextToText:
                 ("system", self.prompt),
             ]
 
+            memory_digest = history_context.get_memory_digest()
+            if memory_digest:
+                messages.append((
+                    "system",
+                    "Long-term memory (facts from earlier in the conversation):\n" + memory_digest,
+                ))
+
             for conversation in history:
                 if conversation.get("user"):
                     messages.append(("user", conversation["user"]))
